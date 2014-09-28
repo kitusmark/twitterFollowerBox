@@ -1,4 +1,12 @@
 twitterFollowerBox
 ==================
+Arduino + Ethernet shield + 7segment displays = **Twitter Followers Box**
 
-Arduino + Ethernet shield + 7segment displays = Twitter follower box
+
+This is just a simple project where I use some IoT geeky tech. The Arduino is connected to the internet and grabs some information (Twitter Followers from a public account) and simply displays it in some cool 7-segment displays.
+
+How to get your data
+=================
+Since Twitter shut down the API1.0, it's a little bit more difficult to get up and running. Basically you need to set up an 'App' in the [twitter developers section](dev.twitter.com) and make a http request using the GET method.
+
+Since this is a pain in the ass for Arduino to acomplish. I've set a simple *php* script in my server that gets the number for me and the arduino gets it from the page served. It's kind of messy but we'll get along.

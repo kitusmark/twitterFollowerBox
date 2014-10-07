@@ -1,86 +1,99 @@
+/*
+  TwitterFollowerBox by Marc Cobler
+  
+  This skecth connects to a server running some php code which gets the Twitter Followers 
+  out of a public account. Then we display the number to a 7 segment display. Like the good
+  old days.
+  It's important to read how I set up my server in order to decode the data
+  to learn more go to http://github.com/kitusmark/twitterFollowerBox
+  I'm using an Arduino UNO + Ethernet Shield + some 7 segments LEDs
+  
+  
+  created 8 oct 2014
+  Marc Cobler
+*/s
 
 #include <SPI.h>
 #include <Ethernet.h>
 
+//Assign a MAC address and a IP. Check this if system not working properly
 byte macAddress[] = {
   0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x01};
 IPAddress ip(192,168,1,111);
 
-//Inicializamos una instancia de la libreria
-EthernetClient client;
+//Create an EthernetClient object
+EthernetClient server;
+//delay between server requests, 60 seconds.
+const unsigned long requestInterval = 60000; 
+//Set the server name and store it in flash, char array. URL
+const char serverName[] PROGMEM= "jfmc.synology.me";
 
-const unsigned long intervaloPeticiones = 30000; //delay entre peticiones al servidor
-
-char nombreServidor[]= ""; //URL
-unsigned long tiempoUltimoIntento = 0;
-String lineaActual = "";
-String followers = "";
-boolean leyendoFollowers = false; //Si actualmente estamos leyendo el tweet
+unsigned long lastAttemptTime = 0; //Last time connected to the server in milliseconds
+String buffer = "";                //String to read from the html info from the server
+String followers = "";            //String to hold the important data
+boolean readingFollowers = false; //If we are currently reading the twitter followers data
 //======================================================================================================
 void setup() {
-  // primero reservamos espacio para las Strings
-  lineaActual.reserve(256);
-  followers.reserve(100);
+  //Convert the char Array of serverName to a String
+  charArrayToString();*************
+  // we reserve some space in memory in order to manipulate the strings
+  buffer.reserve(100);
+  followers.reserve(10); 
   
-  //Abrimos el puerto serie y esperamos a que se abra correctamente
+  //Open a Serial port and wait to be ready. Only for Leonardo
   Serial.begin(9600);
   while (!Serial) {
-   ; //Simplemente esperamos 
+   ; //Simply do nothing 
   }
 
-  //Intentamos conectar mediante DHCP
-  Serial.println("Intentando obtener una dirección IP mediante DHCP:");
+  //We try some DHCP connection
+  Serial.println("trying to get an IP using DHCP:");
   if (!Ethernet.begin(macAddress)) {
-      Serial.println("La conexión mediante DHCP ha fallado. Intentandolo manualmente..."); 
+      Serial.println("the DHCP connection failed, trying manually..."); 
       Ethernet.begin(macAddress, ip);
   }
-  Serial.println("La dirección asignada es:");
-  Serial.println(Ethernet.localIP());
+  Serial.println("Good! we got a valid address: ");
+  Serial.print(Ethernet.localIP());
   
-  //Conectar al servidor de Twitter
-  conectarServidor();
+  //Connect to the server
+  connectToServer();
 
 }
 //=======================================================================================================
 void loop() {
   // 
-    if (client.connected()) {
-    if (client.available()) {
+    if (server.connected()) {
+    if (server.available()) {
       // read incoming bytes:
-      char inChar = client.read();
+      char inChar = server.read();
 
       // add incoming byte to end of line:
-      lineaActual += inChar; 
+      buffer += inChar; 
 
       // if you get a newline, clear the line:
       if (inChar == '\n') {
-        lineaActual = "";
+        buffer = "";
       } 
-      // if the current line ends with <fan_count>, it will
-      // be followed by the tweet:
-      if ( lineaActual.endsWith("<fan_count>")) {
-        // tweet is beginning. Clear the tweet string:
-        readingFbcount = true; 
-        fbcount = "";
+      // if the current line ends with '<', it will
+      // be followed by the magic number we're waiting for:
+      if ( buffer.endsWith("<")) {
+        //useful info is beginning. Clear the followers string:
+        readingFollowers = true; 
+        followers = "";
       }
-      // if you're currently reading the bytes of the facebook count,
-      // add them to the tweet String:
-      if (readingFbcount) {
-        if (inChar != '<') {
-          fbcount += inChar;
+      // Once we know we're reading the followers, we save the number
+      if (readingFollowers) {
+        if (inChar != '<' | inChar != '>') {
+          followers += inChar;
         } 
         else {
           // if you got a "<" character,
           // you've reached the end of the facebo:
-          readingFbcount = false;
-          Serial.println(fbcount); 
-          lcd.begin(16, 2);
-          lcd.print("Boing Boing likes");
-          lcd.setCursor(0,7);
-          lcd.print(fbcount);
-  
+          readingFollowers = false;
+          Serial.println("You're followed by: ");
+          Serial.print(followers + "people"); 
           // close the connection to the server:
-          client.stop(); 
+          server.stop(); 
         }
       }
     }   
@@ -92,21 +105,26 @@ void loop() {
   }
 
 }
-
-void conectarServidor() {
-  //intentar conectar
-  Serial.println("Conectando al servidor...");
-  String contenido = "";
+//==============================FUNCTIONS=====================================
+void connectToServer() {
+  //connecting to the server via Internet
+  Serial.println("Connecting to the specified Server...");
+  String host = "";
   
-  if(client.connect(nombreServidor,80)) {
-     Serial.println("Haciendo la petición HTTP");
-     //HTTP GET petición a twitter
-     client.println("GET HTTP/1.1"); 
-     //Declaramos el servidor correcto
-     client.println("HOST: " + contenido.concat(nombreServidor));
-     client.println();
+  if(server.connect(serverName,80)) {
+     Serial.println("Making the HTTP request...");
+     //HTTP GET request to the specified server
+     server.println("GET /arduinoFollowersBox/arduinoFollowersBox.php HTTP/1.1"); 
+     host.concat("HOST: ", serverName);
+     server.println(host);
+     server.println("Connection: close");
+     server.println();
   }
   
   // note the time of this connect attempt:
-  tiempoUltimoIntento = millis();
+  lastAttemptTime = millis();
+}
+
+charArrayToString() {
+  
 }
